@@ -1,0 +1,45 @@
+{
+  "categories": [
+    {
+      "id": 0,
+      "name": "bottle"
+    },
+    {
+      "id": 1,
+      "name": "dove"
+    },
+    {
+      "id": 2,
+      "name": "lays"
+    },
+    {
+      "id": 3,
+      "name": "marble_cake"
+    },
+    {
+      "id": 4,
+      "name": "maza"
+    },
+    {
+      "id": 5,
+      "name": "munch"
+    },
+    {
+      "id": 6,
+      "name": "pink_cone"
+    },
+    {
+      "id": 7,
+      "name": "thumps_up"
+    },
+    {
+      "id": 8,
+      "name": "yellow_cone"
+    }
+  ],
+  "info": {
+    "year": 2025,
+    "version": "1.0",
+    "contributor": "Label Studio"
+  }
+}

@@ -1,0 +1,9 @@
+bottle
+dove
+lays
+marble_cake
+maza
+munch
+pink_cone
+thumps_up
+yellow_cone
