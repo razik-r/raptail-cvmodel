@@ -30,7 +30,7 @@ parser.add_argument('--record', help='Record results from video or webcam and sa
 parser.add_argument('--api_endpoint', help='API endpoint to send detected object details', required=True)
 parser.add_argument('--db_path', help='Path to SQLite database file containing inventory', required=True)
 parser.add_argument('--conf_thresh', help='Confidence threshold for matching detected objects (example: "0.85")',
-                    default=0.75)
+                    default=0.43)
 
 args = parser.parse_args()
 
@@ -87,6 +87,8 @@ inventory_cache = load_inventory_cache(db_path)
 def get_item_details(classname):
     return inventory_cache.get(classname, (None, None))
 
+
+
 # Function to send data to the API endpoint
 def send_to_api(payload, api_endpoint):
     try:
@@ -98,6 +100,8 @@ def send_to_api(payload, api_endpoint):
 
 # Load the model
 model = YOLO(model_path, task='detect')
+model.export(format="openvino")
+ov_model = YOLO('my_model_openvino_model/')
 labels = model.names
 
 # Parse input source type
@@ -150,7 +154,7 @@ img_count = 0
 
 # Function to process a frame
 def process_frame(frame):
-    results = model(frame, verbose=False)
+    results = ov_model(frame, verbose=False)
     detections = results[0].boxes
     object_count = 0 
 

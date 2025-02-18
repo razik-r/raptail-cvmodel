@@ -1,0 +1,4 @@
+Requirement already satisfied: openvino in c:\users\razikr\anaconda3\envs\yolo-env1\lib\site-packages (2025.0.0)
+Requirement already satisfied: numpy<2.3.0,>=1.16.6 in c:\users\razikr\anaconda3\envs\yolo-env1\lib\site-packages (from openvino) (1.26.4)
+Requirement already satisfied: openvino-telemetry>=2023.2.1 in c:\users\razikr\anaconda3\envs\yolo-env1\lib\site-packages (from openvino) (2025.0.0)
+Requirement already satisfied: packaging in c:\users\razikr\anaconda3\envs\yolo-env1\lib\site-packages (from openvino) (24.2)

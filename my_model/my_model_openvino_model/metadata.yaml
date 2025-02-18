@@ -1,0 +1,27 @@
+description: Ultralytics YOLO11s model trained on /content/data.yaml
+author: Ultralytics
+date: '2025-02-18T02:26:10.808931'
+version: 8.3.65
+license: AGPL-3.0 License (https://ultralytics.com/license)
+docs: https://docs.ultralytics.com
+stride: 32
+task: detect
+batch: 1
+imgsz:
+- 640
+- 640
+names:
+  0: bottle
+  1: dove
+  2: lays
+  3: marble_cake
+  4: maza
+  5: munch
+  6: pink_cone
+  7: thumps_up
+  8: yellow_cone
+args:
+  batch: 1
+  half: false
+  int8: false
+  dynamic: false
