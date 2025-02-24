@@ -11,6 +11,13 @@ import cv2
 import csv
 import numpy as np
 from ultralytics import YOLO
+from collections import defaultdict
+import time
+from deep_sort_realtime.deepsort_tracker import DeepSort
+
+
+
+
 
 # Define and parse user input arguments
 parser = argparse.ArgumentParser()
@@ -99,7 +106,7 @@ def send_to_api(payload, api_endpoint):
         print(f'Failed to send data to API: {e}')
 
 # Load the model
-model = YOLO(model_path, task='detect')
+model = YOLO(model_path, task='detect' )
 model.export(format="openvino")
 ov_model = YOLO('my_model_openvino_model/')
 labels = model.names
@@ -152,47 +159,149 @@ bbox_colors = [(164,120,87), (68,148,228), (93,97,209), (178,182,133), (88,159,1
 # Initialize variables
 img_count = 0
 
-# Function to process a frame
-def process_frame(frame):
-    results = ov_model(frame, verbose=False)
-    detections = results[0].boxes
-    object_count = 0 
 
+
+# Function to process a frame
+# def process_frame(frame):
+#     results = ov_model(frame, verbose=False)
+#     detections = results[0].boxes
+#     object_count = 0  
+
+#     deepsort_detections = []
+#     filtered_detections = []
+
+#     for i in range(len(detections)):
+#         xyxy_tensor = detections[i].xyxy.cpu()
+#         xmin, ymin, xmax, ymax = xyxy_tensor.numpy().squeeze().astype(int)
+
+#         classidx = int(detections[i].cls.item())
+#         classname = labels[classidx] if classidx < len(labels) else f"Unknown_{classidx}"
+#         conf = detections[i].conf.item()
+#         # Print debug information
+#         print(f"Class Index: {classidx}, Class Name: {classname}, Confidence: {conf}")
+
+#         if conf > conf_thresh:  # Confidence threshold to match
+#             item_id, price = get_item_details(classname)
+#             if item_id and price:
+#                 payload = {
+#                     "id": item_id,
+#                     "name": classname,
+#                     "price": price,
+#                     "quantity": 1,
+#                     "payable": price
+#                 }
+#                 send_to_api(payload, api_endpoint)
+
+#             color = bbox_colors[classidx % len(bbox_colors)]
+#             cv2.rectangle(frame, (xmin, ymin), (xmax, ymax), color, 2)
+
+#             # Draw the label
+#             label = f'{classname}: {int(conf * 100)}%'
+#             label_ymin = max(ymin, 10)
+#             cv2.rectangle(frame, (xmin, label_ymin - 10), (xmin + 100, label_ymin + 5), color, cv2.FILLED)
+#             cv2.putText(frame, label, (xmin, label_ymin), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
+
+#             object_count += 1
+#     cv2.imshow('YOLO detection results', frame)
+
+
+
+# Initialize DeepSort tracker
+tracker = DeepSort(
+    max_age=90,
+    n_init=1,
+    nms_max_overlap=0.1,
+    max_cosine_distance=0.3,
+    nn_budget=200,
+    # override_track_class=None,
+    embedder="mobilenet",
+    half=True,
+    bgr=True,
+    polygon=False,
+    # today=None
+)
+
+# Store processed tracks with timestamps
+processed_tracks = {}  # track_id: {"logged": bool}
+
+# COOLDOWN_SECONDS = 5  # Prevent duplicate processing
+
+def process_frame(frame):
+    frame = cv2.resize(frame, (1280, 720))
+    results = ov_model(frame,imgsz=480, verbose=False)
+    detections = results[0].boxes
+
+    # Prepare DeepSort detections
+    deepsort_detections = []
     for i in range(len(detections)):
         xyxy_tensor = detections[i].xyxy.cpu()
         xmin, ymin, xmax, ymax = xyxy_tensor.numpy().squeeze().astype(int)
-
         classidx = int(detections[i].cls.item())
-        classname = labels[classidx] if classidx < len(labels) else f"Unknown_{classidx}"
+        global conf
         conf = detections[i].conf.item()
+        
 
-        # Print debug information
-        print(f"Class Index: {classidx}, Class Name: {classname}, Confidence: {conf}")
+        if conf > conf_thresh:
+            width = xmax - xmin
+            height = ymax - ymin
+            deepsort_detections.append(([xmin, ymin, width, height], conf, classidx))
 
-        if conf > conf_thresh:  # Confidence threshold to match
+    # Update tracker
+    tracks = tracker.update_tracks(deepsort_detections, frame=frame)
+    active_track_ids = set()
+
+    for track in tracks:
+        if not track.is_confirmed():
+            continue
+
+        track_id = track.track_id
+        active_track_ids.add(track_id)
+        bbox = track.to_ltrb()
+        class_id = track.get_det_class()
+        classname = labels[class_id] if class_id < len(labels) else f"Unknown_{class_id}"
+        
+        # conf = track.confidence if hasattr(track, 'confidence') else 1.0
+        
+        # Initialize track state
+        if track_id not in processed_tracks:
+            processed_tracks[track_id] = {"logged": False}
+
+        # Process only once per object
+        if not processed_tracks[track_id]["logged"]:
             item_id, price = get_item_details(classname)
             if item_id and price:
                 payload = {
-                    "id": item_id,
+
+                    "id": track_id,
                     "name": classname,
                     "price": price,
                     "quantity": 1,
                     "payable": price
                 }
                 send_to_api(payload, api_endpoint)
+                processed_tracks[track_id]["logged"] = True
+                
 
-            color = bbox_colors[classidx % len(bbox_colors)]
-            cv2.rectangle(frame, (xmin, ymin), (xmax, ymax), color, 2)
+        # Visualization (always update)
+        x1, y1, x2, y2 = map(int, bbox)
+        color = bbox_colors[class_id % len(bbox_colors)]
+        # Draw bounding box
+        cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
+        # Draw label (original style)
+        label = f'{classname}: {int(conf * 100)}%'  # Use conf from track
+        label_ymin = max(y1, 10)
+        cv2.rectangle(frame, (x1, label_ymin - 10), 
+                     (x1 + 100, label_ymin + 5), color, cv2.FILLED)
+        cv2.putText(frame, label, (x1, label_ymin),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
 
-            # Draw the label
-            label = f'{classname}: {int(conf * 100)}%'
-            label_ymin = max(ymin, 10)
-            cv2.rectangle(frame, (xmin, label_ymin - 10), (xmin + 100, label_ymin + 5), color, cv2.FILLED)
-            cv2.putText(frame, label, (xmin, label_ymin), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
+    # Cleanup tracks that left the scene
+    for track_id in list(processed_tracks.keys()):
+        if track_id not in active_track_ids:
+            del processed_tracks[track_id]
 
-            object_count += 1
-    cv2.imshow('YOLO detection results', frame)
-
+    cv2.imshow('DeepSort Tracking', frame)
+    return frame
 # Begin inference loop
 while True:
     # Load frame from source

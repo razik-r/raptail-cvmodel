@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { io } from 'socket.io-client';
 import { ShoppingCart, Package, CreditCard, Trash2 } from 'lucide-react';
 
-const socket = io('http://localhost:3000/product');
+const socket = io('http://localhost:3000');
+socket.on('connect', () => console.log('Connected to WebSocket'));
 
 function App() {
   // State to store cart items and total amount
@@ -32,9 +33,7 @@ function App() {
     });
 
     // Cleanup socket listener on component unmount
-    return () => {
-      socket.off('cartUpdate');
-    };
+    
   }, []);
 
   // Recalculate the total whenever the items change
@@ -67,7 +66,7 @@ function App() {
   const handleClearCart = async () => {
     try {
       const response = await fetch('http://localhost:3000/api/product', {
-        method: 'POST',
+        method: 'GET',
       });
       if (!response.ok) {
         throw new Error('Failed to clear cart');
@@ -80,29 +79,28 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow">
+    <div className="font-poppins min-h-screen bg-gray-100">
+      <header className="bg-slate-950 shadow rounded-b-xl">
         <div className="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8 flex justify-between items-center">
           <div className="flex items-center space-x-3">
             <Package className="h-8 w-8 text-indigo-600" />
-            <h1 className="text-3xl font-bold text-gray-900">Raptail AI</h1>
+            <h1 className="text-3xl font-bold text-gray-200">Raptail AI</h1>
           </div>
+            
           <div className="flex items-center space-x-4">
-            <ShoppingCart className="h-6 w-6 text-gray-600" />
-            <span className="text-lg font-semibold">{items.length} items</span>
+            <ShoppingCart className="h-6 w-6 text-white" />
+            <span className=" text-white text-lg font-semibold">{items.length} items</span>
           </div>
+       
         </div>
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
-        <div className="bg-white rounded-lg shadow-lg p-6">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-semibold text-gray-900">Shopping Cart</h2>
+        <div className="bg-gray-150 rounded-lg p-6">
+          <div className="flex justify-between items-center mb-10 bg-white border border-gray-200 shadow   rounded-2xl p-8">
+            <h2 className="text-2xl font-semibold text-gray-800">Shopping Cart</h2>
             {items.length > 0 && (
-              <button
-                onClick={handleClearCart}
-                className="flex items-center space-x-2 text-red-600 hover:text-red-700"
-              >
+              <button onClick={handleClearCart} className="flex items-center space-x-2 text-red-600 hover:text-red-700">
                 <Trash2 className="h-5 w-5" />
                 <span>Clear Cart</span>
               </button>
@@ -110,23 +108,25 @@ function App() {
           </div>
 
           {items.length === 0 ? (
-            <div className="text-center py-12">
-              <Package className="mx-auto h-12 w-12 text-gray-400" />
-              <p className="mt-2 text-gray-500">Your cart is empty</p>
-            </div>
+           
+             <div className="text-center py-12">
+              <Package className="mx-auto h-12 w-12 text-gray-300" />
+              <p className="mt-2 text-gray-400">Your cart is empty</p>
+            </div>   
           ) : (
             <>
-              <div className="border-t border-gray-200">
+              <div className=" border border-gray-200 bg-white shadow  rounded-2xl">
                 {items.map((item) => (
-                  <div key={item.id} className="py-6 flex items-center justify-between">
-                    <div className="flex-1">
+                  <div key={item.id} className="  border-t border-gray-200 p-5  flex items-center justify-between">
+                    <div className="p-3  flex-1">
                       <h3 className="text-lg font-medium text-gray-900">{item.name}</h3>
                       <p className="mt-1 text-sm text-gray-500">
                       <span >&#x20B9;</span>{item.price.toFixed(2)} per item
                       </p>
                     </div>
                     <div className="flex items-center space-x-8">
-                      <span className="text-gray-600">Qty: {item.quantity}</span>
+                      
+                      <span className="text-gray-600 border border-gray-200 shadow rounded-xl pl-3 pr-3 pt-2 pb-2">Qty: {item.quantity}</span>
                       <span className="text-lg font-medium text-gray-900">
                       <span >&#x20B9;</span>{item.payable.toFixed(2)}
                       </span>
@@ -135,13 +135,15 @@ function App() {
                 ))}
               </div>
 
-              <div className="border-t border-gray-200 pt-6 mt-6">
+              <div className="border-t border-gray-200 pt-6 mt-3">
+                <div className="bg-white shadow border border-gray-200 rounded-2xl p-5">
                 <div className="flex justify-between items-center">
                   <span className="text-xl font-semibold text-gray-900">Total</span>
                   <span className="text-2xl font-bold text-indigo-600">
                   <span >&#x20B9;</span>{total.toFixed(2)}
                   </span>
                 </div>
+                
 
                 <button
                   onClick={handleCheckout}
@@ -150,6 +152,7 @@ function App() {
                   <CreditCard className="h-5 w-5 mr-2" />
                   Proceed to Checkout
                 </button>
+              </div>
               </div>
             </>
           )}
