@@ -65,7 +65,7 @@ function App() {
   // Handle clearing the cart
   const handleClearCart = async () => {
     try {
-      const response = await fetch('http://localhost:3000/api/product', {
+      const response = await fetch('http://localhost:3000/product', {
         method: 'GET',
       });
       if (!response.ok) {
@@ -79,7 +79,7 @@ function App() {
   };
 
   return (
-    <div className="font-poppins min-h-screen bg-gray-100">
+    <div className="font-poppins min-h-screen bg-white">
       <header className="bg-slate-950 shadow rounded-b-xl">
         <div className="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8 flex justify-between items-center">
           <div className="flex items-center space-x-3">
@@ -95,10 +95,12 @@ function App() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
-        <div className="bg-gray-150 rounded-lg p-6">
-          <div className="flex justify-between items-center mb-10 bg-white border border-gray-200 shadow   rounded-2xl p-8">
-            <h2 className="text-2xl font-semibold text-gray-800">Shopping Cart</h2>
+      <main className="max-w-7xl mx-auto px-4  lg:px-8">
+     
+
+        <div className="  min-h-full mt-8  rounded-lg p-6">
+          <div className="flex   justify-between items-center  bg-slate-950 border border-gray-900 shadow-2xl   rounded-t-2xl p-8">
+            <h2 className="text-2xl font-semibold text-white">Shopping Cart</h2>
             {items.length > 0 && (
               <button onClick={handleClearCart} className="flex items-center space-x-2 text-red-600 hover:text-red-700">
                 <Trash2 className="h-5 w-5" />
@@ -109,7 +111,7 @@ function App() {
 
           {items.length === 0 ? (
            
-             <div className="text-center py-12">
+             <div className="text-center py-12  border-2 border-white shadow-2xl   rounded-b-2xl">
               <Package className="mx-auto h-12 w-12 text-gray-300" />
               <p className="mt-2 text-gray-400">Your cart is empty</p>
             </div>   

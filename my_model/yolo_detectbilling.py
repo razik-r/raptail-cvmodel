@@ -16,6 +16,11 @@ import time
 from deep_sort_realtime.deepsort_tracker import DeepSort
 
 
+import torch
+import torchvision.models as models
+
+from sklearn.metrics.pairwise import cosine_similarity
+
 
 
 
@@ -208,28 +213,64 @@ img_count = 0
 
 # Initialize DeepSort tracker
 tracker = DeepSort(
-    max_age=90,
-    n_init=1,
-    nms_max_overlap=0.1,
-    max_cosine_distance=0.3,
-    nn_budget=200,
-    # override_track_class=None,
-    embedder="mobilenet",
-    half=True,
-    bgr=True,
-    polygon=False,
-    # today=None
+    max_age=60,  # Keep tracks alive for 60 frames after disappearance
+    n_init=3,  # Require 3 detections to confirm a track
+    max_cosine_distance=0.5,  # Increased threshold for re-identification
+    nn_budget=100,  # Store 100 embeddings per track
+    embedder="mobilenet",  # Use MobileNet for feature extraction
+    half=True,  # Use half-precision for faster computation
+    bgr=True,  # Input images are in BGR format
+    polygon=False,  # Use rectangular bounding boxes
 )
 
-# Store processed tracks with timestamps
-processed_tracks = {}  # track_id: {"logged": bool}
+# Store processed tracks with timestamps and embeddings
+processed_tracks = {}  # track_id: {"logged": bool, "embedding": np.array}
 
 # COOLDOWN_SECONDS = 5  # Prevent duplicate processing
 
-def process_frame(frame):
-    frame = cv2.resize(frame, (1280, 720))
-    results = ov_model(frame,imgsz=480, verbose=False)
+def preprocess_crop(crop, target_size=(224, 224)):
+    """Preprocess the cropped image for the embedder."""
+    # Resize the crop
+    crop = cv2.resize(crop, target_size)
+
+    # Normalize to [0, 1]
+    crop = crop.astype(np.float32) / 255.0
+
+    # Convert to [C, H, W] format
+    crop = np.transpose(crop, (2, 0, 1))
+
+    # Add batch dimension [1, C, H, W]
+    crop = np.expand_dims(crop, axis=0)
+
+    # Convert to PyTorch tensor
+    crop = torch.from_numpy(crop).float()
+
+    return crop
+
+
+
+# Load a pre-trained MobileNet model as the embedder
+embedder = models.mobilenet_v2(pretrained=True)
+embedder.classifier = torch.nn.Identity()  # Remove the final classification layer
+embedder.eval()  # Set to evaluation mode
+
+def extract_embedding(crop, embedder):
+    """Extract embedding from a preprocessed crop."""
+    with torch.no_grad():  # Disable gradient calculation
+        embedding = embedder(crop)  # Forward pass through the embedder
+    return embedding.numpy()  # Convert to NumPy array
+
+
+
+
+
+
+def process_frame(frame,embedder):
+    frame = cv2.resize(frame, (640, 480))
+    results = ov_model(frame, imgsz=480, verbose=False)
     detections = results[0].boxes
+
+    
 
     # Prepare DeepSort detections
     deepsort_detections = []
@@ -239,7 +280,6 @@ def process_frame(frame):
         classidx = int(detections[i].cls.item())
         global conf
         conf = detections[i].conf.item()
-        
 
         if conf > conf_thresh:
             width = xmax - xmin
@@ -259,19 +299,40 @@ def process_frame(frame):
         bbox = track.to_ltrb()
         class_id = track.get_det_class()
         classname = labels[class_id] if class_id < len(labels) else f"Unknown_{class_id}"
-        
-        # conf = track.confidence if hasattr(track, 'confidence') else 1.0
-        
+
         # Initialize track state
         if track_id not in processed_tracks:
-            processed_tracks[track_id] = {"logged": False}
+            processed_tracks[track_id] = {"logged": False, "embedding": None}
+
+        # Extract embedding for the current track
+        x1, y1, x2, y2 = map(int, bbox)
+        crop = frame[y1:y2, x1:x2]
+        if crop.size > 0:  # Ensure the crop is valid
+            crop = preprocess_crop(crop)
+
+            embedding = extract_embedding(crop,embedder)    # Extract embedding
+
+            processed_tracks[track_id]["embedding"] = embedding
+
+        # Check if this is a re-identified track
+        for old_track_id, old_track_data in processed_tracks.items():
+            if old_track_id == track_id:
+                continue  # Skip the current track
+            if old_track_data["embedding"] is not None and embedding is not None:
+                # Compare embeddings using cosine similarity
+                similarity = cosine_similarity(
+                    old_track_data["embedding"].reshape(1, -1),
+                    embedding.reshape(1, -1))
+                if similarity > 0.7:  # Adjust threshold as needed
+                    # Re-identified track: Use the old track ID
+                    track_id = old_track_id
+                    break
 
         # Process only once per object
         if not processed_tracks[track_id]["logged"]:
             item_id, price = get_item_details(classname)
             if item_id and price:
                 payload = {
-
                     "id": track_id,
                     "name": classname,
                     "price": price,
@@ -280,7 +341,6 @@ def process_frame(frame):
                 }
                 send_to_api(payload, api_endpoint)
                 processed_tracks[track_id]["logged"] = True
-                
 
         # Visualization (always update)
         x1, y1, x2, y2 = map(int, bbox)
@@ -290,7 +350,7 @@ def process_frame(frame):
         # Draw label (original style)
         label = f'{classname}: {int(conf * 100)}%'  # Use conf from track
         label_ymin = max(y1, 10)
-        cv2.rectangle(frame, (x1, label_ymin - 10), 
+        cv2.rectangle(frame, (x1, label_ymin - 10),
                      (x1 + 100, label_ymin + 5), color, cv2.FILLED)
         cv2.putText(frame, label, (x1, label_ymin),
                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
@@ -325,7 +385,7 @@ while True:
         frame = cv2.resize(frame, (resW, resH))
 
     # Process the frame
-    process_frame(frame)
+    process_frame(frame,embedder)
 
     # Wait for key press
     key = cv2.waitKey(5 if source_type in ['video', 'usb', 'stream'] else 0)
