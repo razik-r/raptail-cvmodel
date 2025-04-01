@@ -1,6 +1,6 @@
-description: Ultralytics YOLO11n model trained on /content/data.yaml
+description: Ultralytics my_model model trained on /content/data.yaml
 author: Ultralytics
-date: '2025-03-11T02:47:37.402439'
+date: '2025-03-28T15:02:07.220014'
 version: 8.3.65
 license: AGPL-3.0 License (https://ultralytics.com/license)
 docs: https://docs.ultralytics.com
@@ -8,21 +8,11 @@ stride: 32
 task: detect
 batch: 1
 imgsz:
-- 480
-- 480
+- 640
+- 640
 names:
-  0: bottle
-  1: dove
-  2: gillete-foam
-  3: lays
-  4: marble_cake
-  5: maza
-  6: munch
-  7: pink_cone
-  8: thumps_up
-  9: time_pass
-  10: yardley_rollon
-  11: yellow_cone
+  0: gillette-foam
+  1: yardley_rollon
 args:
   batch: 1
   half: false

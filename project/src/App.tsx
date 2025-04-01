@@ -99,7 +99,7 @@ function App() {
      
 
         <div className="  min-h-full mt-8  rounded-lg p-6">
-          <div className="flex   justify-between items-center  bg-slate-950 border border-gray-900 shadow-2xl   rounded-t-2xl p-8">
+          <div className="flex   justify-between items-center  bg-slate-950 border border-gray-900  mb-2   rounded-2xl p-8">
             <h2 className="text-2xl font-semibold text-white">Shopping Cart</h2>
             {items.length > 0 && (
               <button onClick={handleClearCart} className="flex items-center space-x-2 text-red-600 hover:text-red-700">
@@ -111,7 +111,7 @@ function App() {
 
           {items.length === 0 ? (
            
-             <div className="text-center py-12  border-2 border-white shadow-2xl   rounded-b-2xl">
+             <div className="text-center py-12  border border-gray-200    rounded-2xl">
               <Package className="mx-auto h-12 w-12 text-gray-300" />
               <p className="mt-2 text-gray-400">Your cart is empty</p>
             </div>   

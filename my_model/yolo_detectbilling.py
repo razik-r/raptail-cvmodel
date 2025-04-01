@@ -42,7 +42,7 @@ parser.add_argument('--record', help='Record results from video or webcam and sa
 parser.add_argument('--api_endpoint', help='API endpoint to send detected object details', required=True)
 parser.add_argument('--db_path', help='Path to SQLite database file containing inventory', required=True)
 parser.add_argument('--conf_thresh', help='Confidence threshold for matching detected objects (example: "0.85")',
-                    default=0.43)
+                    default=0.65)
 
 args = parser.parse_args()
 
@@ -260,14 +260,9 @@ def extract_embedding(crop, embedder):
         embedding = embedder(crop)  # Forward pass through the embedder
     return embedding.numpy()  # Convert to NumPy array
 
-
-
-
-
-
 def process_frame(frame,embedder):
     frame = cv2.resize(frame, (640, 480))
-    results = ov_model(frame, imgsz=480, verbose=False)
+    results = ov_model(frame, imgsz=640, verbose=False)
     detections = results[0].boxes
 
     
@@ -303,6 +298,9 @@ def process_frame(frame,embedder):
         # Initialize track state
         if track_id not in processed_tracks:
             processed_tracks[track_id] = {"logged": False, "embedding": None}
+
+         # Initialize embedding variable
+        embedding = None
 
         # Extract embedding for the current track
         x1, y1, x2, y2 = map(int, bbox)

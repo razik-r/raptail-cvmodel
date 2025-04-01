@@ -7,6 +7,7 @@ import time
 import cv2
 import numpy as np
 from ultralytics import YOLO
+import torch
 
 # Define and parse user input arguments
 parser = argparse.ArgumentParser()
