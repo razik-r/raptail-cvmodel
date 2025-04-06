@@ -2,24 +2,65 @@ import { useEffect, useState } from 'react';
 import { io } from 'socket.io-client';
 import { ShoppingCart, Package, CreditCard, Trash2 } from 'lucide-react';
 
+interface CartItem {
+  id: number;
+  name: string;
+  price: number;
+  quantity?: number;
+  payable?: number;
+  imageUrl?: string;  
+
+}
+
 const socket = io('http://localhost:3000');
 socket.on('connect', () => console.log('Connected to WebSocket'));
 
 function App() {
   // State to store cart items and total amount
-  const [items, setItems] = useState([]);
-  const [total, setTotal] = useState(0);
+  const [items, setItems] = useState<CartItem[]>([]);
+  const [total, setTotal] = useState<number>(0);
+
+  // Function to group items by name and sum quantities with proper typing
+  const groupItems = (cartItems: CartItem[]): CartItem[] => {
+    if (!Array.isArray(cartItems)) {
+      console.error('Expected array but received:', cartItems);
+      return [];
+    }
+
+    const grouped: Record<string, CartItem> = {};
+    
+    cartItems.forEach(item => {
+      if (!item || typeof item !== 'object') {
+        console.error('Invalid item format:', item);
+        return;
+      }
+
+      if (!grouped[item.name]) {
+        grouped[item.name] = {
+          ...item,
+          quantity: 1,
+          payable: item.price
+        };
+      } else {
+        grouped[item.name].quantity = (grouped[item.name].quantity || 0) + 1;
+        grouped[item.name].payable = (grouped[item.name].payable || 0) + item.price;
+      }
+    });
+    
+    return Object.values(grouped);
+  };
 
   // Fetch initial cart data from the backend
   useEffect(() => {
     const fetchItems = async () => {
       try {
-        const response = await fetch('http://localhost:3000/product');
+        const response = await fetch('http://localhost:3000/api/product');
         if (!response.ok) {
           throw new Error('Failed to fetch items');
         }
         const data = await response.json();
-        setItems(data); // Update the state with the received items
+
+        setItems(groupItems(data)); // Update the state with the received items
       } catch (error) {
         console.error('Error fetching items:', error);
       }
@@ -29,7 +70,7 @@ function App() {
 
     // Listen for real-time cart updates via socket.io
     socket.on('cartUpdate', (updatedCart) => {
-      setItems(updatedCart); // Update the state with the new cart data
+      setItems(groupItems(updatedCart));  
     });
 
     // Cleanup socket listener on component unmount
@@ -79,7 +120,7 @@ function App() {
   };
 
   return (
-    <div className="font-poppins min-h-screen bg-white">
+    <div className=" min-h-screen bg-white">
       <header className="bg-slate-950 shadow rounded-b-xl">
         <div className="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8 flex justify-between items-center">
           <div className="flex items-center space-x-3">
@@ -89,7 +130,9 @@ function App() {
             
           <div className="flex items-center space-x-4">
             <ShoppingCart className="h-6 w-6 text-white" />
-            <span className=" text-white text-lg font-semibold">{items.length} items</span>
+            <span className=" text-white text-lg font-semibold">{  items.reduce((total, item) => total + (item.quantity || 1), 0)} items</span>
+
+           
           </div>
        
         </div>
@@ -117,21 +160,33 @@ function App() {
             </div>   
           ) : (
             <>
-              <div className=" border border-gray-200 bg-white shadow  rounded-2xl">
+              <div className=" border border-gray-200 bg-white shadow  rounded-2xl  ">
                 {items.map((item) => (
-                  <div key={item.id} className="  border-t border-gray-200 p-5  flex items-center justify-between">
-                    <div className="p-3  flex-1">
-                      <h3 className="text-lg font-medium text-gray-900">{item.name}</h3>
-                      <p className="mt-1 text-sm text-gray-500">
+                  <div key={item.name} className="  border-t border-gray-300 rounded-2xl p-5  flex items-center justify-between">
+                    <div className="p-2 gap-2 flex ">
+                      <div className="flex size-14 bg-gray-300 rounded-[5px] border ">
+                      <img 
+  src={`http://localhost:3000/images/${item.imageUrl || 'default.png'}`}
+  alt={item.name}
+  className="size-14 object-cover rounded-[5px] border"
+  onError={(e) => {
+    (e.target as HTMLImageElement).src = 'http://localhost:3000/images/default.png';
+  }}
+/>                                      
+                      </div>
+                      <div className="flex-col  ">
+                      <h3 className="text-lg font-medium text-gray-900 ">{item.name}</h3>
+                      <p className="text-sm text-gray-500">
                       <span >&#x20B9;</span>{item.price.toFixed(2)} per item
                       </p>
+                      </div>
                     </div>
-                    <div className="flex items-center space-x-8">
+                    <div className="flex items-center gap-3.5 place-items-start  ">
                       
-                      <span className="text-gray-600 border border-gray-200 shadow rounded-xl pl-3 pr-3 pt-2 pb-2">Qty: {item.quantity}</span>
-                      <span className="text-lg font-medium text-gray-900">
+                      <div className="text-gray-600 border   border-gray-200  rounded-xl text-nowrap  p-1.5">Qty: {item.quantity}</div>
+                      <div className="text-lg font-medium text-gray-900 w-20">
                       <span >&#x20B9;</span>{item.payable.toFixed(2)}
-                      </span>
+                      </div>
                     </div>
                   </div>
                 ))}

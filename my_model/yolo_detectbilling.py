@@ -14,12 +14,15 @@ from ultralytics import YOLO
 from collections import defaultdict
 import time
 from deep_sort_realtime.deepsort_tracker import DeepSort
-
+import urllib
 
 import torch
 import torchvision.models as models
 
 from sklearn.metrics.pairwise import cosine_similarity
+
+from threading import Thread
+from queue import Queue, Empty
 
 
 
@@ -46,6 +49,36 @@ parser.add_argument('--conf_thresh', help='Confidence threshold for matching det
 
 args = parser.parse_args()
 
+
+frame_queue = Queue(maxsize=1)  # Single-frame buffer for latest frame
+stream_active = False
+
+def stream_reader(url):
+    global stream_active
+    stream = urllib.request.urlopen(url)
+    bytes_data = bytes()
+    stream_active = True
+    
+    while stream_active:
+        try:
+            bytes_data += stream.read(512)
+            a = bytes_data.find(b'\xff\xd8')
+            b = bytes_data.find(b'\xff\xd9')
+            
+            if a != -1 and b != -1:
+                jpg = bytes_data[a:b+2]
+                bytes_data = bytes_data[b+2:]
+                frame = cv2.imdecode(np.frombuffer(jpg, dtype=np.uint8), cv2.IMREAD_COLOR)
+                
+                # Maintain only latest frame in queue
+                if frame_queue.full():
+                    frame_queue.get_nowait()
+                frame_queue.put(frame)
+                
+        except Exception as e:
+            print(f"Stream error: {str(e)}")
+            break
+
 # Parse user inputs
 model_path = args.model
 img_source = args.source
@@ -65,7 +98,7 @@ if not os.path.exists(model_path):
 def create_sample_db():
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
-    cursor.execute("CREATE TABLE IF NOT EXISTS inventory (id INTEGER PRIMARY KEY, name TEXT, price INTEGER)")
+    cursor.execute("CREATE TABLE IF NOT EXISTS inventory (id INTEGER PRIMARY KEY, name TEXT, price INTEGER, image_path TEXT)")
 
     csv_file= "inventory.csv"
     with open(csv_file, mode="r") as file:
@@ -73,8 +106,8 @@ def create_sample_db():
         for row in csv_reader:
             # Insert each row into the SQLite table
             cursor.execute("""
-            INSERT OR IGNORE INTO inventory (id, name, price)
-            VALUES (:id, :name, :price)
+            INSERT OR IGNORE INTO inventory (id, name, price,image_path)
+            VALUES (:id, :name, :price,:image_path)
             """, row)
         
        
@@ -88,8 +121,8 @@ create_sample_db()
 def load_inventory_cache(db_path):
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
-    cursor.execute("SELECT name, id, price FROM inventory")
-    inventory_cache = {row[0]: (row[1], row[2]) for row in cursor.fetchall()}
+    cursor.execute("SELECT name, id, price,image_path FROM inventory")
+    inventory_cache = {row[0]: (row[1], row[2], row[3]) for row in cursor.fetchall()}  # Include image_path
     conn.close()
     return inventory_cache
 
@@ -97,7 +130,7 @@ inventory_cache = load_inventory_cache(db_path)
 
 # Function to fetch item details from the cache
 def get_item_details(classname):
-    return inventory_cache.get(classname, (None, None))
+    return inventory_cache.get(classname, (None, None,None))
 
 
 
@@ -133,9 +166,13 @@ elif 'usb' in img_source:
     usb_idx = int(img_source[3:])
 elif img_source.startswith('http://') or img_source.startswith('https://'):
     source_type = 'stream'
+
+    Thread(target=stream_reader, args=(img_source,), daemon=True).start()
 else:
     print(f'Input {img_source} is invalid. Please try again.')
     sys.exit(0)
+
+
 
 # Parse user-specified display resolution
 resize = False
@@ -213,9 +250,9 @@ img_count = 0
 
 # Initialize DeepSort tracker
 tracker = DeepSort(
-    max_age=60,  # Keep tracks alive for 60 frames after disappearance
-    n_init=3,  # Require 3 detections to confirm a track
-    max_cosine_distance=0.5,  # Increased threshold for re-identification
+    max_age=10,  # Keep tracks alive for 60 frames after disappearance
+    n_init=1,  # Require 3 detections to confirm a track
+    max_cosine_distance=0.1,  # Increased threshold for re-identification
     nn_budget=100,  # Store 100 embeddings per track
     embedder="mobilenet",  # Use MobileNet for feature extraction
     half=True,  # Use half-precision for faster computation
@@ -328,14 +365,15 @@ def process_frame(frame,embedder):
 
         # Process only once per object
         if not processed_tracks[track_id]["logged"]:
-            item_id, price = get_item_details(classname)
+            item_id, price,image_path = get_item_details(classname)
             if item_id and price:
                 payload = {
                     "id": track_id,
                     "name": classname,
                     "price": price,
                     "quantity": 1,
-                    "payable": price
+                    "payable": price,
+                    "imageUrl": image_path
                 }
                 send_to_api(payload, api_endpoint)
                 processed_tracks[track_id]["logged"] = True
@@ -378,6 +416,11 @@ while True:
         if not ret:
             print('Reached end of the video file or stream error. Exiting program.')
             break
+    elif source_type == 'stream':
+        try:
+            frame = frame_queue.get(timeout=0.1)
+        except Empty:
+            continue
 
     if resize:
         frame = cv2.resize(frame, (resW, resH))

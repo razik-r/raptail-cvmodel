@@ -1,4 +1,4 @@
-id,name,price
+id,name,price,image_path
 1,bottle,10
 2,dove,50
 3,lays,10
@@ -8,5 +8,5 @@ id,name,price
 7,pink_cone,20
 8,thumps_up,40
 9,yellow_cone,20
-10,gillette-foam,90
-11,yardley_rollon,115
+10,gillette-foam,90,gillete.png
+11,yardley_rollon,115,yardley.png

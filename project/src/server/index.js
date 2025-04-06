@@ -4,6 +4,12 @@ import cors from 'cors';
 
 import { Server as SocketIO } from 'socket.io';
 import { createServer } from 'http'; 
+import { createRequire } from 'module';
+
+const require = createRequire(import.meta.url);
+
+const sqlite3 = require('sqlite3').verbose();
+
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -30,6 +36,24 @@ app.use(cors(
 ));
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
+
+const dbPath = 'C:\\Users\\razikr\\raptail-cvmodel\\my_model\\inventory.db'; 
+
+const db = new sqlite3.Database(dbPath); // Your SQLite file
+app.use('/images', express.static('images'));
+
+// Example product endpoint
+app.get('/product', (req, res) => {
+    // Query should include image_path as imageUrl
+    db.all("SELECT id, name, price, image_path as imageUrl FROM inventory", [], (err, rows) => {
+        if (err) {
+
+            res.status(500).json({error: err.message});
+            return;
+        }
+        res.json(rows);
+    });
+});
 
 
 app.get('/', (req, res) => {
