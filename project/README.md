@@ -1,61 +1,72 @@
 # Smart Checkout System
 
-A real-time object detection and self-checkout system using computer vision.
+A real-time self-checkout demo that combines:
+- React + Vite frontend
+- Express + Socket.IO backend
+- SQLite inventory database
 
-## Components
+## Run locally (demo mode)
 
-1. **Object Detection (Python)**
-   - Simulated computer vision system
-   - Detects products in real-time
-   - Sends detections to backend API
+```bash
+npm install
+npm run dev
+```
 
-2. **Backend Server (Node.js)**
-   - Express.js REST API
-   - Real-time updates with Socket.IO
-   - Manages shopping cart and checkout
+- Frontend: `http://localhost:5173`
+- Backend API + Socket server: `http://localhost:3000`
 
-3. **Frontend (React)**
-   - Real-time cart updates
-   - Beautiful UI with Tailwind CSS
-   - Checkout functionality
+## Deploy as a demonstrable product
 
-## Setup
+This repository now supports a single-process deployment: the backend serves API endpoints, WebSocket updates, product images, and the built frontend UI.
 
-1. Install dependencies:
-   ```bash
-   npm install
-   pip install requests pillow numpy opencv-python
-   ```
+### 1) Build frontend assets
 
-2. Start the backend server:
-   ```bash
-   npm run dev:backend
-   ```
+```bash
+npm run build
+```
 
-3. Start the frontend development server:
-   ```bash
-   npm run dev:frontend
-   ```
+### 2) Start production server
 
-4. Run the object detection script:
-   ```bash
-   python object_detection.py
-   ```
+```bash
+npm run start
+```
 
-## Features
+Then open:
+- `http://<your-host>:3000`
 
-- Real-time object detection
-- Automatic product recognition
-- Live cart updates
-- Beautiful checkout interface
-- Mock payment processing
+## Environment variables
 
-## Note
+Create `.env` from `.env.example` when needed.
 
-This is a demonstration system. In a production environment, you would:
+| Variable | Default | Purpose |
+|---|---|---|
+| `PORT` | `3000` | HTTP server port |
+| `FRONTEND_ORIGIN` | `http://localhost:5173` | CORS + Socket.IO origin for development |
+| `DB_PATH` | `src/server/inventory.db` | SQLite file location |
+| `IMAGE_DIR` | `src/server/images` | Product image directory |
+| `STATIC_DIR` | `dist` | Built frontend assets directory |
+| `VITE_API_BASE_URL` | `http://localhost:3000` | Frontend API/Socket base URL |
 
-1. Use a proper ML model (e.g., YOLOv8)
-2. Implement secure payment processing
-3. Add user authentication
-4. Use a proper database
-5. Add error handling and retry mechanisms
+## Docker deployment
+
+### Build image
+
+```bash
+docker build -t smart-checkout-demo .
+```
+
+### Run container
+
+```bash
+docker run --rm -p 3000:3000 smart-checkout-demo
+```
+
+Open `http://localhost:3000`.
+
+## API quick check
+
+```bash
+curl http://localhost:3000/health
+curl http://localhost:3000/api/cart
+curl http://localhost:3000/api/products
+```
